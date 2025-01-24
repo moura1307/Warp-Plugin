@@ -58,6 +58,7 @@ public class WarpCommand implements CommandExecutor, TabCompleter {
 
             savedLocations.put(key, player.getLocation());
             player.sendMessage("Location '" + locationName + "' has been saved!");
+            saveLocations();  // Save locations after setting new one
         } else if (args[0].equalsIgnoreCase("remove")) {
             if (args.length < 2) {
                 player.sendMessage("Usage: /warp remove <name>");
@@ -69,7 +70,9 @@ public class WarpCommand implements CommandExecutor, TabCompleter {
 
             if (savedLocations.containsKey(key)) {
                 savedLocations.remove(key);
+                config.set(key, null); // Remove location from the config
                 player.sendMessage("Location '" + locationName + "' has been removed!");
+                saveLocations();  // Save the updated locations to the config
             } else {
                 player.sendMessage("Location '" + locationName + "' does not exist!");
             }
@@ -127,6 +130,7 @@ public class WarpCommand implements CommandExecutor, TabCompleter {
             savedLocations.remove(oldKey);  // Remove the old location
             savedLocations.put(newKey, location);  // Save with the new name
             player.sendMessage("Location '" + oldName + "' has been renamed to '" + newName + "'!");
+            saveLocations();  // Save the updated locations to the config
             return true;
         }
         return true;
