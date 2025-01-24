@@ -1,13 +1,25 @@
 package com.coffee.warpCommand;
 
-import org.bukkit.event.Listener;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class Main extends JavaPlugin implements Listener {
+public class Main extends JavaPlugin {
+
+    private WarpCommand warpCommand;
 
     @Override
     public void onEnable() {
-        getCommand("warp").setExecutor(new WarpCommand());
+        // Register events and commands
+        warpCommand = new WarpCommand(this);
+        getCommand("warp").setExecutor(warpCommand);
+
+        // Load locations when the plugin starts
+        warpCommand.loadLocations();
     }
 
+    @Override
+    public void onDisable() {
+        // Save locations when the server shuts down
+        warpCommand.saveLocations();
+    }
 }

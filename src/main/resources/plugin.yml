@@ -7,4 +7,4 @@ description: Plugin for testing
 commands:
   warp:
     description: Salve localizações e volte rapidamente a elas!
-    usage: /warp <set | list | remove> [name]
+    usage: /warp <list | rename | remove | set | to> [name]
