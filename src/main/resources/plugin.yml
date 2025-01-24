@@ -1,0 +1,10 @@
+name: TheWarpPlugin
+version: '1.0-SNAPSHOT'
+main: com.coffee.warpCommand.Main
+api-version: '1.21'
+authors: [Coffee]
+description: Plugin for testing
+commands:
+  warp:
+    description: Salve localizações e volte rapidamente a elas!
+    usage: /warp <set | list | remove> [name]
