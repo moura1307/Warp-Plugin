@@ -1,8 +1,8 @@
 name: TheWarpPlugin
-version: '2.2.0'
+version: '1.0.0'
 main: com.coffee.warpCommand.Main
 api-version: '1.21'
-authors: [Coffee]
+authors: [Coffee1307]
 description: Plugin for all your warping needs!
 commands:
   warp:
