@@ -1,223 +1,215 @@
 package com.coffee.warpCommand;
 
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
-import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.*;
+import org.bukkit.command.*;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-
 import java.util.*;
 
 public class WarpCommand implements CommandExecutor, TabCompleter {
 
     private final Map<String, Location> savedLocations = new HashMap<>();
     private final JavaPlugin plugin;
-    private FileConfiguration config;
+
+    // Constants for messages
+    private static final String USAGE_MESSAGE =
+            "§6Usage:§f /warp <§e list | rename | remove | set | to> [name] §f>";
+
+    private static final String PLAYER_ONLY_MESSAGE = "§cThis command is for players only!";
 
     public WarpCommand(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.config = plugin.getConfig();  // Use the plugin's config file
+        plugin.saveDefaultConfig();
+        loadLocations();
     }
 
     @Override
-    public boolean onCommand(CommandSender commandSender, Command command, String label, String[] args) {
-        if (!(commandSender instanceof Player)) {
-            commandSender.sendMessage("This is a player-only command.");
+    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+        if (!(sender instanceof Player)) {
+            sender.sendMessage(PLAYER_ONLY_MESSAGE);
             return true;
         }
 
-        Player player = (Player) commandSender;
+        Player player = (Player) sender;
 
         if (args.length == 0) {
-            // If no arguments are provided, show the list of available subcommands
-            player.sendMessage("/warp list - List all your saved locations");
-            player.sendMessage("/warp remove <name> - Remove a saved location");
-            player.sendMessage("/warp rename <oldName> <newName> - Rename a saved location");
-            player.sendMessage("/warp set <name> - Save your current location with the given name");
-            player.sendMessage("/warp to <name> - Teleports you to given location");
+            sendUsage(player);
             return true;
         }
 
-        if (args[0].equalsIgnoreCase("set")) {
-            if (args.length < 2) {
-                player.sendMessage("Usage: /warp set <name>");
-                return true;
-            }
-
-            String locationName = args[1];
-            String key = player.getName() + ":" + locationName;
-
-            if (savedLocations.containsKey(key)) {
-                player.sendMessage("A location with the name '" + locationName + "' already exists! Please choose a different name.");
-                return true;
-            }
-
-            savedLocations.put(key, player.getLocation());
-            player.sendMessage("Location '" + locationName + "' has been saved!");
-            saveLocations();  // Save locations after setting new one
-        } else if (args[0].equalsIgnoreCase("remove")) {
-            if (args.length < 2) {
-                player.sendMessage("Usage: /warp remove <name>");
-                return true;
-            }
-
-            String locationName = args[1];
-            String key = player.getName() + ":" + locationName;
-
-            if (savedLocations.containsKey(key)) {
-                savedLocations.remove(key);
-                config.set(key, null); // Remove location from the config
-                player.sendMessage("Location '" + locationName + "' has been removed!");
-                saveLocations();  // Save the updated locations to the config
-            } else {
-                player.sendMessage("Location '" + locationName + "' does not exist!");
-            }
-        } else if (args[0].equalsIgnoreCase("list")) {
-            List<String> playerLocations = new ArrayList<>();
-            for (String key : savedLocations.keySet()) {
-                if (key.startsWith(player.getName() + ":")) {
-                    playerLocations.add(key.split(":")[1]);
-                }
-            }
-
-            if (playerLocations.isEmpty()) {
-                player.sendMessage("You have no saved locations!");
-            } else {
-                player.sendMessage("Your saved locations:");
-                for (String location : playerLocations) {
-                    player.sendMessage("- " + location);
-                }
-            }
-        } else if (args[0].equalsIgnoreCase("to")) {
-            String locationName = args[1];
-            Location location = savedLocations.get(player.getName() + ":" + locationName);
-            if (location != null) {
-                player.teleport(location);
-                player.sendMessage("Teleported to '" + locationName + "'!");
-            } else {
-                player.sendMessage("No location found with the name '" + locationName + "'.");
-            }
-        } else if (args[0].equalsIgnoreCase("rename")) {
-            if (args.length < 3) {
-                player.sendMessage("Usage: /warp rename <oldName> <newName>");
-                return true;
-            }
-
-            String oldName = args[1];
-            String newName = args[2];
-
-            String oldKey = player.getName() + ":" + oldName;
-            String newKey = player.getName() + ":" + newName;
-
-            // Check if the old location exists
-            if (!savedLocations.containsKey(oldKey)) {
-                player.sendMessage("Location '" + oldName + "' does not exist!");
-                return true;
-            }
-
-            // Check if the new name is already taken
-            if (savedLocations.containsKey(newKey)) {
-                player.sendMessage("Location with the name '" + newName + "' already exists!");
-                return true;
-            }
-
-            // Rename the location
-            Location location = savedLocations.get(oldKey);
-            savedLocations.remove(oldKey);  // Remove the old location
-            savedLocations.put(newKey, location);  // Save with the new name
-            player.sendMessage("Location '" + oldName + "' has been renamed to '" + newName + "'!");
-            saveLocations();  // Save the updated locations to the config
-            return true;
+        String subCommand = args[0].toLowerCase();
+        switch (subCommand) {
+            case "set": handleSet(player, args); break;
+            case "remove": handleRemove(player, args); break;
+            case "to": handleTeleport(player, args); break;
+            case "list": handleList(player); break;
+            case "rename": handleRename(player, args); break;
+            default: sendUsage(player);
         }
         return true;
     }
 
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (command.getName().equalsIgnoreCase("warp")) {
-            if (args.length == 1) {
-                // Show subcommands for the first argument
-                return Arrays.asList("list", "remove", "rename", "set", "to");
-            } else if (args[0].equalsIgnoreCase("set") || args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("rename")) {
-                if (args.length == 2) {
-                    // Suggest saved location names for /warp set <name>, /warp remove <name>, or /warp rename <oldName>
-                    if (sender instanceof Player) {
-                        Player player = (Player) sender;
-                        List<String> playerLocations = new ArrayList<>();
-                        for (String key : savedLocations.keySet()) {
-                            if (key.startsWith(player.getName() + ":")) {
-                                playerLocations.add(key.split(":")[1]);
-                            }
-                        }
-                        return playerLocations;
-                    }
-                } else if (args[0].equalsIgnoreCase("rename") && args.length == 3) {
-                    // Suggest saved location names for the second argument of /warp rename <oldName> <newName>, excluding the first argument
-                    if (sender instanceof Player) {
-                        Player player = (Player) sender;
-                        List<String> playerLocations = new ArrayList<>();
-                        String oldName = args[1]; // The first argument is the old location name
+    // ========== COMMAND HANDLERS ==========
+    private void handleSet(Player player, String[] args) {
+        if (!validateArgs(player, args, 2, "§6Usage:§f /warp set <§ename§f>")) return;
 
-                        // Add all saved locations except the one provided in the first argument (oldName)
-                        for (String key : savedLocations.keySet()) {
-                            if (key.startsWith(player.getName() + ":")) {
-                                String locationName = key.split(":")[1];
-                                if (!locationName.equalsIgnoreCase(oldName)) {
-                                    playerLocations.add(locationName);
-                                }
-                            }
-                        }
-                        return playerLocations; // Return locations excluding the oldName
-                    }
-                }
-            } else if (args[0].equalsIgnoreCase("to") && args.length == 2) {
-                if (sender instanceof Player) {
-                    Player player = (Player) sender;
-                    List<String> playerLocations = new ArrayList<>();
-                    for (String key : savedLocations.keySet()) {
-                        if (key.startsWith(player.getName() + ":")) {
-                            playerLocations.add(key.split(":")[1]);
-                        }
-                    }
-                    return playerLocations;  // Suggest saved locations for /warp to <name>
-                }
-            }
+        String key = buildKey(player, args[1]);
+        if (savedLocations.containsKey(key)) {
+            player.sendMessage("§cLocation '§e" + args[1] + "§c' already exists!");
+            return;
         }
-        return null; // Let Minecraft handle default completions
+
+        Location loc = getBlockCenterLocation(player.getLocation());
+        savedLocations.put(key, loc);
+        player.sendMessage("§aLocation '§e" + args[1] + "§a' saved!");
+        saveLocations();
     }
-    public void saveLocations() {
-        for (String key : savedLocations.keySet()) {
-            Location location = savedLocations.get(key);
-            config.set(key + ".world", location.getWorld().getName());
-            config.set(key + ".x", location.getX());
-            config.set(key + ".y", location.getY());
-            config.set(key + ".z", location.getZ());
-            config.set(key + ".yaw", location.getYaw());
-            config.set(key + ".pitch", location.getPitch());
+    private void handleRemove(Player player, String[] args) {
+        if (!validateArgs(player, args, 2, "§6Usage:§f /warp remove <§ename§f>")) return;
+
+        String key = buildKey(player, args[1]);
+        if (!savedLocations.containsKey(key)) {
+            player.sendMessage("§cLocation '§e" + args[1] + "§c' not found!");
+            return;
         }
+
+        savedLocations.remove(key);
+        player.sendMessage("§aLocation '§e" + args[1] + "§a' removed!");
+        saveLocations();
+    }
+
+    private void handleTeleport(Player player, String[] args) {
+        if (!validateArgs(player, args, 2, "§6Usage:§f /warp to <§ename§f>")) return;
+
+        String key = buildKey(player, args[1]);
+        Location loc = savedLocations.get(key);
+        if (loc == null || loc.getWorld() == null) {
+            player.sendMessage("§cLocation '§e" + args[1] + "§c' is invalid!");
+            return;
+        }
+
+        player.teleport(loc);
+        player.sendMessage("§aTeleported to '§e" + args[1] + "§a'!");
+    }
+
+    private void handleList(Player player) {
+        List<String> locations = getPlayerLocations(player);
+        if (locations.isEmpty()) {
+            player.sendMessage("§cYou have no saved locations!");
+            return;
+        }
+
+        player.sendMessage("§6Your saved locations:");
+        locations.forEach(loc -> player.sendMessage("§7- §e" + loc));
+    }
+
+    private void handleRename(Player player, String[] args) {
+        if (!validateArgs(player, args, 3, "§6Usage:§f /warp rename <§eold§f> <§enew§f>")) return;
+
+        String oldKey = buildKey(player, args[1]);
+        String newKey = buildKey(player, args[2]);
+
+        if (!savedLocations.containsKey(oldKey)) {
+            player.sendMessage("§cLocation '§e" + args[1] + "§c' not found!");
+            return;
+        }
+
+        if (savedLocations.containsKey(newKey)) {
+            player.sendMessage("§cLocation '§e" + args[2] + "§c' already exists!");
+            return;
+        }
+
+        Location loc = savedLocations.get(oldKey);
+        savedLocations.remove(oldKey);
+        savedLocations.put(newKey, loc);
+        player.sendMessage("§aRenamed '§e" + args[1] + "§a' to '§e" + args[2] + "§a'!");
+        saveLocations();
+    }
+
+    private Location getBlockCenterLocation(Location original) {
+        Location blockCenter = original.getBlock().getLocation()
+                .add(0.5, 0, 0.5); // Center of block
+        blockCenter.setYaw(calculateSnappedYaw(original.getYaw()));
+        blockCenter.setPitch(1);
+        return blockCenter;
+    }
+
+    private float calculateSnappedYaw(float yaw) {
+        yaw = (yaw % 360 + 360) % 360; // Normalize
+        return (Math.round(yaw / 45) * 45) % 360; // Snap to 45-degree increments
+    }
+
+    // [Keep all other handlers (remove, teleport, list, rename) unchanged from previous version]
+
+    // ========== PERSISTENCE ==========
+    public void saveLocations() {
+        ConfigurationSection section = plugin.getConfig().createSection("warps");
+        savedLocations.forEach((key, loc) ->
+                section.set(key, loc.serialize())
+        );
         plugin.saveConfig();
     }
 
-    // Load the locations from the config file on server startup
     public void loadLocations() {
-        savedLocations.clear();  // Clear existing locations before loading
-        FileConfiguration config = plugin.getConfig();
-        Set<String> keys = config.getKeys(false);
-        for (String key : keys) {
-            if (key.contains(":")) {
-                String worldName = config.getString(key + ".world");
-                double x = config.getDouble(key + ".x");
-                double y = config.getDouble(key + ".y");
-                double z = config.getDouble(key + ".z");
-                float yaw = (float) config.getDouble(key + ".yaw");
-                float pitch = (float) config.getDouble(key + ".pitch");
-                Location location = new Location(Bukkit.getWorld(worldName), x, y, z, yaw, pitch);
-                savedLocations.put(key, location);
+        savedLocations.clear();
+        ConfigurationSection section = plugin.getConfig().getConfigurationSection("warps");
+        if (section == null) return;
+
+        section.getKeys(false).forEach(key -> {
+            Location loc = Location.deserialize(section.getConfigurationSection(key).getValues(false));
+            if (loc.getWorld() != null) {
+                savedLocations.put(key, loc);
             }
+        });
+    }
+
+    // ========== TAB COMPLETION ==========
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+        if (!(sender instanceof Player)) return Collections.emptyList();
+        Player player = (Player) sender;
+
+        if (args.length == 1) {
+            return filterCompletions(args[0], Arrays.asList("set", "remove", "rename", "to", "list"));
         }
+
+        if (args.length == 2) {
+            List<String> locations = getPlayerLocations(player);
+            return filterCompletions(args[1], locations);
+        }
+        return Collections.emptyList();
+    }
+
+    // ========== HELPERS ==========
+    private List<String> getPlayerLocations(Player player) {
+        List<String> locations = new ArrayList<>();
+        String prefix = player.getName().toLowerCase() + ":";
+        savedLocations.keySet().stream()
+                .filter(key -> key.startsWith(prefix))
+                .map(key -> key.substring(prefix.length()))
+                .forEach(locations::add);
+        return locations;
+    }
+
+    private String buildKey(Player player, String locationName) {
+        return player.getName().toLowerCase() + ":" + locationName.toLowerCase();
+    }
+
+    private boolean validateArgs(Player player, String[] args, int required, String errorMessage) {
+        if (args.length >= required) return true;
+        player.sendMessage(errorMessage);
+        return false;
+    }
+
+    private void sendUsage(Player player) {
+        player.sendMessage(USAGE_MESSAGE);
+    }
+
+    private List<String> filterCompletions(String input, List<String> options) {
+        return options.stream()
+                .filter(opt -> opt.toLowerCase().startsWith(input.toLowerCase()))
+                .sorted()
+                .toList();
     }
 }

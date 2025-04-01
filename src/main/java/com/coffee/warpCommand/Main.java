@@ -1,12 +1,8 @@
 package com.coffee.warpCommand;
-
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class Main extends JavaPlugin {
-
     private WarpCommand warpCommand;
-
     @Override
     public void onEnable() {
         // Register events and commands
