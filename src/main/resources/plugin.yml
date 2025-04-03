@@ -1,5 +1,5 @@
 name: TheWarpPlugin
-version: '1.0.0'
+version: '1.1.0' #This NEEDS to match the GitHub version.
 main: com.coffee.warpCommand.Main
 api-version: '1.21'
 authors: [Coffee1307]
@@ -8,3 +8,7 @@ commands:
   warp:
     description: Save locations and quickly return to them!
     usage: /warp <list | rename | remove | set | to> [name]
+  warpconfig:
+    description: Toggle auto-update checks
+    usage: /warpconfig <enable|disable>
+  config:
