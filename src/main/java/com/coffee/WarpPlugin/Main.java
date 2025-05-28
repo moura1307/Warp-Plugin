@@ -22,7 +22,7 @@ public class Main extends JavaPlugin {
     private String currentVersion;
     private String githubRepo;
     private WarpCommand warpCommand;
-    private com.coffee.warpCommand.WarpConfig warpConfig;
+    private com.coffee.WarpPlugin.WarpConfig warpConfig;
 
     @Override
     public void onEnable() {
@@ -31,7 +31,7 @@ public class Main extends JavaPlugin {
         CommandManager.initialize(this);
 
         this.warpCommand = new WarpCommand(this);
-        this.warpConfig = new com.coffee.warpCommand.WarpConfig();
+        this.warpConfig = new com.coffee.WarpPlugin.WarpConfig();
 
         getCommand("warp").setExecutor(warpCommand);
         getCommand("warpconfig").setExecutor(warpConfig);
