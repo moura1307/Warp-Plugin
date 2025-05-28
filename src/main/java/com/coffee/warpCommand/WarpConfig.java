@@ -1,117 +1,56 @@
 package com.coffee.warpCommand;
 
-import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
+import org.bukkit.command.*;
 import org.bukkit.entity.Player;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class WarpConfig implements CommandExecutor, TabCompleter {
-
-    private final Main main;
-    private static final String USAGE_MESSAGE = ChatColor.GOLD + "Usage: " + ChatColor.WHITE
-            + "/warpconfig " + ChatColor.YELLOW + "autoupdate <enable|disable>";
-
-    public WarpConfig(Main main) {
-        this.main = main;
-    }
+    private static final String USAGE = "§6Usage:§f /warpconfig <WarpOpOnly|WarpPublicOnly> <enable|disable>";
+    private static final String PLAYER_ONLY = "§cThis command is for players only!";
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatColor.RED + "Only players can use this command!");
+        if (!(sender instanceof Player) || !sender.isOp()) {
+            sender.sendMessage("§cNo permission!");
             return true;
         }
 
-        Player player = (Player) sender;
-
-        if (!player.isOp()) {
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    "&cThis is an &eOperator-Only &ccommand!"));
+        if (args.length < 2) {
+            sender.sendMessage(USAGE);
             return true;
         }
 
-        if (args.length == 0) {
-            sendUsage(player);
-            return true;
-        }
+        String mode = args[0].toLowerCase();
+        boolean enable = args[1].equalsIgnoreCase("enable");
 
-        if (!args[0].equalsIgnoreCase("autoupdate")) {
-            sendUsage(player);
-            return true;
+        switch (mode) {
+            case "warpoponly":
+                CommandManager.setWarpOpOnlyMode(enable);
+                sender.sendMessage("§aOP-only mode " + (enable ? "enabled" : "disabled"));
+                break;
+            case "warppubliconly":
+                CommandManager.setPublicOnlyMode(enable);
+                sender.sendMessage("§aPublic-only mode " + (enable ? "enabled" : "disabled"));
+                break;
+            default:
+                sender.sendMessage(USAGE);
         }
-
-        handleAutoUpdate(player, args);
         return true;
-    }
-
-    private void handleAutoUpdate(Player player, String[] args) {
-        if (!validateArgs(player, args, 2,
-                "&6Usage: &f/warpconfig autoupdate <&eenable|disable&f>")) {
-            return;
-        }
-
-        String state = args[1].toLowerCase();
-        if (!state.equals("enable") && !state.equals("disable")) {
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&',
-                    "&cInvalid option! Use &eenable &cor &edisable"));
-            return;
-        }
-
-        boolean enable = state.equals("enable");
-        boolean currentState = main.getConfig().getBoolean("auto-update.enabled", true);
-
-        if (enable == currentState) {
-            String message = enable ?
-                    "&aAuto-update is already &2enabled" :
-                    "&aAuto-update is already &4disabled";
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
-            return;
-        }
-
-        main.getConfig().set("auto-update.enabled", enable);
-        main.saveConfig();
-
-        player.sendMessage(ChatColor.translateAlternateColorCodes('&', "&aAuto-update " + (enable ? "&2enabled" : "&4disabled")));
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        List<String> completions = new ArrayList<>();
-
-        if (!(sender instanceof Player) || !((Player) sender).isOp()) {
-            return completions;
-        }
+        List<String> options = new ArrayList<>();
+        if (!(sender instanceof Player) || !sender.isOp()) return options;
 
         if (args.length == 1) {
-            if ("autoupdate".startsWith(args[0].toLowerCase())) {
-                completions.add("autoupdate");
-            }
-        }
-        else if (args.length == 2 && args[0].equalsIgnoreCase("autoupdate")) {
-            for (String option : Arrays.asList("enable", "disable")) {
-                if (option.startsWith(args[1].toLowerCase())) {
-                    completions.add(option);
-                }
-            }
+            options.addAll(Arrays.asList("WarpOpOnly", "WarpPublicOnly"));
+        } else if (args.length == 2) {
+            options.addAll(Arrays.asList("enable", "disable"));
         }
 
-        return completions;
-    }
-
-    private boolean validateArgs(Player player, String[] args, int required, String errorMessage) {
-        if (args.length >= required) {
-            return true;
-        }
-        // Send the error message with proper color formatting
-        player.sendMessage(ChatColor.translateAlternateColorCodes('&', errorMessage));
-        return false;
-    }
-    private void sendUsage(Player player) {
-        player.sendMessage(USAGE_MESSAGE);
+        return options.stream()
+                .filter(opt -> opt.toLowerCase().startsWith(args[args.length-1].toLowerCase()))
+                .toList();
     }
 }

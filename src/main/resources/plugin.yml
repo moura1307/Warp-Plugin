@@ -1,14 +1,27 @@
 name: TheWarpPlugin
-version: '1.1.0' #This NEEDS to match the GitHub version.
+version: '1.1.0'
 main: com.coffee.warpCommand.Main
 api-version: '1.21'
 authors: [Coffee1307]
-description: Plugin for all your warping needs!
+description: Advanced warp system with public/private locations
+
+permissions:
+  warp.public:
+    description: "Access public warps"
+    default: true
+  warp.private:
+    description: "Manage private warps"
+    default: true
+  warp.admin:
+    description: "Manage all warps"
+    default: op
+
 commands:
   warp:
-    description: Save locations and quickly return to them!
-    usage: /warp <list | rename | remove | set | to> [name]
+    description: Teleport to locations
+    usage: /warp <list | set | remove | rename | to> [name] [public]
   warpconfig:
-    description: Toggle auto-update checks
-    usage: /warpconfig <enable|disable>
-  config:
+    description: Configure warp settings
+    usage: /warpconfig <WarpOpOnly | WarpPublicOnly> <enable | disable>
+    permission: warp.admin
+    permission-message: "§cYou need to be OP to use this command!"

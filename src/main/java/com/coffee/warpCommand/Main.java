@@ -21,79 +21,27 @@ public class Main extends JavaPlugin {
     private File pendingUpdateFile;
     private String currentVersion;
     private String githubRepo;
-    private long lastUpdateCheck = 0;
     private WarpCommand warpCommand;
     private WarpConfig warpConfig;
 
     @Override
     public void onEnable() {
-        // Initialize configuration first
         saveDefaultConfig();
+        reloadConfig();
+        CommandManager.initialize(this);
 
-        // Initialize commands
         this.warpCommand = new WarpCommand(this);
-        this.warpConfig = new WarpConfig(this);
+        this.warpConfig = new WarpConfig();
 
-        // Register command executors
         getCommand("warp").setExecutor(warpCommand);
         getCommand("warpconfig").setExecutor(warpConfig);
-        getCommand("warpconfig").setTabCompleter(warpConfig);
 
-        // Load saved locations
         warpCommand.loadLocations();
 
-        // Set up update checker
         currentVersion = getDescription().getVersion();
         githubRepo = "moura1307/Warp-Plugin";
-
         checkUpdates();
         Bukkit.getScheduler().runTaskTimerAsynchronously(this, this::checkUpdates, 0, 20 * 60 * 60 * 24);
-    }
-
-    private void downloadUpdate(String downloadUrl) {
-        File tempFile = null;
-        try {
-            // Setup download paths
-            URL url = new URL(downloadUrl);
-            String fileName = downloadUrl.substring(downloadUrl.lastIndexOf("/") + 1);
-            File pluginsDir = new File(Bukkit.getServer().getWorldContainer(), "plugins");
-            tempFile = new File(pluginsDir, fileName + ".tmp");
-            File updateFile = new File(pluginsDir, fileName);
-
-            // Download to temporary file
-            FileUtils.copyURLToFile(url, tempFile);
-
-            // Get expected hash from GitHub
-            String expectedHash = getExpectedHashFromGitHub();
-            if (expectedHash != null) {
-                // Calculate actual hash using Java's built-in MessageDigest
-                String actualHash = calculateSHA256(tempFile);
-
-                if (!expectedHash.equalsIgnoreCase(actualHash)) {
-                    tempFile.delete();
-                    getLogger().severe("Hash verification failed! Downloaded file may be corrupted or tampered with.");
-                    return;
-                }
-            }
-
-            // Safe file replacement
-            if (updateFile.exists()) {
-                File backupFile = new File(pluginsDir, fileName + ".bak");
-                if (backupFile.exists()) backupFile.delete();
-                updateFile.renameTo(backupFile);
-            }
-
-            if (!tempFile.renameTo(updateFile)) {
-                throw new Exception("Failed to rename temporary file");
-            }
-
-            getLogger().warning("Update successfully downloaded. Restart server to apply v" +
-                    getDescription().getVersion());
-
-        } catch (Exception e) {
-            if (tempFile != null && tempFile.exists()) tempFile.delete();
-            getLogger().warning("Update failed: " + e.getMessage());
-        }
     }
 
     private void checkUpdates() {
@@ -128,36 +76,42 @@ public class Main extends JavaPlugin {
         }
     }
 
-    @Override
-    public void onDisable() {
-        warpCommand.saveLocations();
+    private void downloadUpdate(String downloadUrl) {
+        File tempFile = null;
+        try {
+            URL url = new URL(downloadUrl);
+            String fileName = downloadUrl.substring(downloadUrl.lastIndexOf("/") + 1);
+            File pluginsDir = new File(Bukkit.getServer().getWorldContainer(), "plugins");
+            tempFile = new File(pluginsDir, fileName + ".tmp");
+            File updateFile = new File(pluginsDir, fileName);
 
-        if (pendingUpdateFile != null && pendingUpdateFile.exists()) {
-            try {
-                File currentJar = getFile();
-                File pluginsDir = currentJar.getParentFile();
+            FileUtils.copyURLToFile(url, tempFile);
 
-                // Create backup
-                File backupFile = new File(pluginsDir, currentJar.getName() + ".bak");
-                if (backupFile.exists()) Files.delete(backupFile.toPath());
-                Files.copy(currentJar.toPath(), backupFile.toPath());
-
-                // Apply update
-                Files.move(
-                        pendingUpdateFile.toPath(),
-                        currentJar.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING
-                );
-
-                getLogger().info("Successfully updated to new version!");
-            } catch (Exception e) {
-                getLogger().severe("Failed to apply update: " + e.getMessage());
-                try {
-                    if (pendingUpdateFile.exists()) Files.delete(pendingUpdateFile.toPath());
-                } catch (Exception ex) {
-                    getLogger().warning("Failed to clean up: " + ex.getMessage());
+            String expectedHash = getExpectedHashFromGitHub();
+            if (expectedHash != null) {
+                String actualHash = calculateSHA256(tempFile);
+                if (!expectedHash.equalsIgnoreCase(actualHash)) {
+                    tempFile.delete();
+                    getLogger().severe("Hash verification failed!");
+                    return;
                 }
             }
+
+            if (updateFile.exists()) {
+                File backupFile = new File(pluginsDir, fileName + ".bak");
+                if (backupFile.exists()) backupFile.delete();
+                updateFile.renameTo(backupFile);
+            }
+
+            if (!tempFile.renameTo(updateFile)) {
+                throw new Exception("Failed to rename temporary file");
+            }
+
+            pendingUpdateFile = updateFile;
+            getLogger().warning("Update downloaded! Restart server to apply.");
+        } catch (Exception e) {
+            if (tempFile != null && tempFile.exists()) tempFile.delete();
+            getLogger().warning("Update failed: " + e.getMessage());
         }
     }
 
@@ -186,7 +140,6 @@ public class Main extends JavaPlugin {
                         new InputStreamReader(conn.getInputStream())
                 );
 
-                // Option 1: Get from release body
                 String body = (String) response.get("body");
                 if (body != null) {
                     for (String line : body.split("\\r?\\n")) {
@@ -195,15 +148,12 @@ public class Main extends JavaPlugin {
                         }
                     }
                 }
-
-                // Option 2: Get from asset metadata (would require auth)
             }
         } catch (Exception e) {
             getLogger().warning("Couldn't fetch hash from GitHub: " + e.getMessage());
         }
         return null;
     }
-
 
     private boolean isNewerVersion(String latest, String current) {
         String[] latestParts = latest.split("\\.");
@@ -217,5 +167,36 @@ public class Main extends JavaPlugin {
             if (latestNum < currentNum) return false;
         }
         return false;
+    }
+
+    @Override
+    public void onDisable() {
+        warpCommand.saveLocations();
+
+        if (pendingUpdateFile != null && pendingUpdateFile.exists()) {
+            try {
+                File currentJar = getFile();
+                File pluginsDir = currentJar.getParentFile();
+
+                File backupFile = new File(pluginsDir, currentJar.getName() + ".bak");
+                if (backupFile.exists()) Files.delete(backupFile.toPath());
+                Files.copy(currentJar.toPath(), backupFile.toPath());
+
+                Files.move(
+                        pendingUpdateFile.toPath(),
+                        currentJar.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING
+                );
+
+                getLogger().info("Update applied!");
+            } catch (Exception e) {
+                getLogger().severe("Failed to apply update: " + e.getMessage());
+                try {
+                    if (pendingUpdateFile.exists()) Files.delete(pendingUpdateFile.toPath());
+                } catch (Exception ex) {
+                    getLogger().warning("Cleanup failed: " + ex.getMessage());
+                }
+            }
+        }
     }
 }
