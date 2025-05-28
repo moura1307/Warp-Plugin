@@ -1,4 +1,4 @@
-package com.coffee.warpCommand;
+package com.coffee.WarpPlugin;
 
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;

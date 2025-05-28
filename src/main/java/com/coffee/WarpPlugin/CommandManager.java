@@ -1,4 +1,4 @@
-package com.coffee.warpCommand;
+package com.coffee.WarpPlugin;
 
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
