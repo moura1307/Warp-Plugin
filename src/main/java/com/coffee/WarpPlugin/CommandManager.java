@@ -6,22 +6,28 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.*;
 
 public class CommandManager {
-    private static final Map<String, Boolean> commandStates = new HashMap<>();
+    // Constants and configuration groups
     public static final Map<String, List<String>> COMMAND_GROUPS = new HashMap<>();
-    private static JavaPlugin plugin;
-    private static boolean publicOnlyMode = false;
-    private static boolean warpOpOnlyMode = false;
-
     static {
         COMMAND_GROUPS.put("warpoponly", Arrays.asList("set", "remove", "rename"));
     }
 
+    // State management
+    private static final Map<String, Boolean> commandStates = new HashMap<>();
+    private static JavaPlugin plugin;
+
+    // Mode flags
+    private static boolean publicOnlyMode = false;
+    private static boolean warpOpOnlyMode = false;
+
+    // Initialization
     public static void initialize(JavaPlugin plugin) {
         CommandManager.plugin = plugin;
         loadStates();
         loadConfig();
     }
 
+    // Command state accessors
     public static boolean isCommandEnabled(String command) {
         return commandStates.getOrDefault(command.toLowerCase(), true);
     }
@@ -31,28 +37,16 @@ public class CommandManager {
         saveStates();
     }
 
+    // Group state management
     public static void setGroupState(String groupName, boolean enabled) {
-        List<String> subcommands = COMMAND_GROUPS.getOrDefault(groupName.toLowerCase(), Collections.emptyList());
+        List<String> subcommands = COMMAND_GROUPS.getOrDefault(
+                groupName.toLowerCase(),
+                Collections.emptyList()
+        );
         subcommands.forEach(subcmd -> setCommandState("warp." + subcmd, enabled));
     }
 
-    public static void setPublicOnlyMode(boolean enabled) {
-        publicOnlyMode = enabled;
-        plugin.getConfig().set("publiconly-mode", enabled);
-        plugin.saveConfig();
-        if (enabled) setGroupState("warpoponly", false);
-    }
-
-    public static void setWarpOpOnlyMode(boolean enabled) {
-        if (enabled) setPublicOnlyMode(false);
-        warpOpOnlyMode = enabled;
-        plugin.getConfig().set("warpoponly-mode", enabled);
-        plugin.saveConfig();
-
-        // Add this to update command states
-        setGroupState("warpoponly", !enabled);
-    }
-
+    // Mode accessors
     public static boolean isPublicOnlyMode() {
         return publicOnlyMode;
     }
@@ -61,15 +55,45 @@ public class CommandManager {
         return warpOpOnlyMode;
     }
 
+    // Mode modifiers
+    public static void setPublicOnlyMode(boolean enabled) {
+        publicOnlyMode = enabled;
+        plugin.getConfig().set("publiconly-mode", enabled);
+        plugin.saveConfig();
+
+        if (enabled) {
+            setGroupState("warpoponly", false);
+        }
+    }
+
+    public static void setWarpOpOnlyMode(boolean enabled) {
+        if (enabled) {
+            setPublicOnlyMode(false);
+        }
+
+        warpOpOnlyMode = enabled;
+        plugin.getConfig().set("warpoponly-mode", enabled);
+        plugin.saveConfig();
+        setGroupState("warpoponly", !enabled);
+    }
+
+    // Config loading utilities
+    private static void loadConfig() {
+        publicOnlyMode = plugin.getConfig().getBoolean("publiconly-mode", false);
+        warpOpOnlyMode = plugin.getConfig().getBoolean("warpoponly-mode", false);
+    }
+
     private static void loadStates() {
         FileConfiguration config = plugin.getConfig();
         ConfigurationSection section = config.getConfigurationSection("command-states");
 
+        // Initialize warp group commands
         COMMAND_GROUPS.get("warpoponly").forEach(subcmd -> {
             String key = "warp." + subcmd;
-            commandStates.put(key, section != null ? section.getBoolean(key, true   ) : true);
+            commandStates.put(key, section != null ? section.getBoolean(key, true) : true);
         });
 
+        // Load all other commands
         if (section != null) {
             section.getKeys(false).forEach(key -> {
                 if (!commandStates.containsKey(key)) {
@@ -79,11 +103,7 @@ public class CommandManager {
         }
     }
 
-    public static void loadConfig() {
-        publicOnlyMode = plugin.getConfig().getBoolean("publiconly-mode", false);
-        warpOpOnlyMode = plugin.getConfig().getBoolean("warpoponly-mode", false);
-    }
-
+    // State persistence
     private static void saveStates() {
         try {
             FileConfiguration config = plugin.getConfig();
