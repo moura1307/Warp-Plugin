@@ -40,15 +40,17 @@ public class CommandManager {
         publicOnlyMode = enabled;
         plugin.getConfig().set("publiconly-mode", enabled);
         plugin.saveConfig();
-        if (enabled) {
-            setGroupState("warpoponly", false);
-        }
+        if (enabled) setGroupState("warpoponly", false);
     }
 
     public static void setWarpOpOnlyMode(boolean enabled) {
+        if (enabled) setPublicOnlyMode(false);
         warpOpOnlyMode = enabled;
         plugin.getConfig().set("warpoponly-mode", enabled);
         plugin.saveConfig();
+
+        // Add this to update command states
+        setGroupState("warpoponly", !enabled);
     }
 
     public static boolean isPublicOnlyMode() {
@@ -65,7 +67,7 @@ public class CommandManager {
 
         COMMAND_GROUPS.get("warpoponly").forEach(subcmd -> {
             String key = "warp." + subcmd;
-            commandStates.put(key, section != null ? section.getBoolean(key, true) : true);
+            commandStates.put(key, section != null ? section.getBoolean(key, true   ) : true);
         });
 
         if (section != null) {

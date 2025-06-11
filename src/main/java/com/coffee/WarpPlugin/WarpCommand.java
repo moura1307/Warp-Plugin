@@ -249,7 +249,10 @@ public class WarpCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (!(sender instanceof Player)) return Collections.emptyList();
+
         Player player = (Player) sender;
+
+        if (CommandManager.isWarpOpOnlyMode() && !player.isOp()) return Collections.emptyList();
 
         List<String> completions = new ArrayList<>();
 
