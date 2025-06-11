@@ -1,2 +1,8 @@
+publiconly-mode: false
+warpoponly-mode: false
+warps:
+  public: {}
+  private: {}
+command-states: {}
 auto-update:
-  enabled: true
+  enabled: false
