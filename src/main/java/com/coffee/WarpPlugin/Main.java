@@ -16,13 +16,15 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.concurrent.TimeUnit;
 
 public class Main extends JavaPlugin {
+    private WarpCommand warpCommand;
+    private com.coffee.WarpPlugin.WarpConfig warpConfig;
+
     private File pendingUpdateFile;
     private String currentVersion;
     private String githubRepo;
-    private WarpCommand warpCommand;
-    private com.coffee.WarpPlugin.WarpConfig warpConfig;
 
     @Override
     public void onEnable() {
@@ -31,7 +33,7 @@ public class Main extends JavaPlugin {
         CommandManager.initialize(this);
 
         this.warpCommand = new WarpCommand(this);
-        this.warpConfig = new com.coffee.WarpPlugin.WarpConfig();
+        this.warpConfig = new WarpConfig();
 
         getCommand("warp").setExecutor(warpCommand);
         getCommand("warpconfig").setExecutor(warpConfig);
@@ -39,14 +41,13 @@ public class Main extends JavaPlugin {
         warpCommand.loadLocations();
 
         currentVersion = getDescription().getVersion();
-        githubRepo = "moura1307/Warp-Plugin";
-        checkUpdates();
+        githubRepo = "moura1307/Warp-Plugin"; // e.g., "Steve/MyCoolPlugin"
+
+        // Check for updates every 24 hours
         Bukkit.getScheduler().runTaskTimerAsynchronously(this, this::checkUpdates, 0, 20 * 60 * 60 * 24);
     }
 
     private void checkUpdates() {
-        if (!getConfig().getBoolean("auto-update.enabled", true)) return;
-
         try {
             URL url = new URL("https://api.github.com/repos/" + githubRepo + "/releases/latest");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -61,14 +62,25 @@ public class Main extends JavaPlugin {
                 String latestTag = (String) response.get("tag_name");
                 if (latestTag == null) return;
 
-                JSONArray assets = (JSONArray) response.get("assets");
-                if (assets == null || assets.isEmpty()) return;
-
                 String latestVersion = latestTag.replace("v", "");
-                String downloadUrl = (String) ((JSONObject) assets.get(0)).get("browser_download_url");
 
                 if (isNewerVersion(latestVersion, currentVersion)) {
-                    downloadUpdate(downloadUrl);
+                    JSONArray assets = (JSONArray) response.get("assets");
+                    if (assets == null || assets.isEmpty()) return;
+
+                    String downloadUrl = (String) ((JSONObject) assets.get(0)).get("browser_download_url");
+
+                    // Add the new message condition
+                    if (!getConfig().getBoolean("auto-update", true)) {
+                        getLogger().warning("==============================================");
+                        getLogger().warning("A new update (v" + latestVersion + ") is available!");
+                        getLogger().warning("Download it at: " + downloadUrl);
+                        getLogger().warning("Or enable auto-update in config.yml");
+                        getLogger().warning("==============================================");
+                    } else {
+                        // Existing auto-update logic
+                        downloadUpdate(downloadUrl, latestVersion);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -76,27 +88,48 @@ public class Main extends JavaPlugin {
         }
     }
 
-    private void downloadUpdate(String downloadUrl) {
+    private boolean isNewerVersion(String latest, String current) {
+        // Split versions into parts (e.g., 1.2.3 → [1, 2, 3])
+        String[] latestParts = latest.split("\\.");
+        String[] currentParts = current.split("\\.");
+
+        for (int i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
+            int latestNum = (i < latestParts.length) ? Integer.parseInt(latestParts[i]) : 0;
+            int currentNum = (i < currentParts.length) ? Integer.parseInt(currentParts[i]) : 0;
+
+            if (latestNum > currentNum) return true;
+            if (latestNum < currentNum) return false;
+        }
+        return false;
+    }
+
+    private void downloadUpdate(String downloadUrl, String latestVersion) {
         File tempFile = null;
         try {
+            // Setup download paths
             URL url = new URL(downloadUrl);
             String fileName = downloadUrl.substring(downloadUrl.lastIndexOf("/") + 1);
             File pluginsDir = new File(Bukkit.getServer().getWorldContainer(), "plugins");
             tempFile = new File(pluginsDir, fileName + ".tmp");
             File updateFile = new File(pluginsDir, fileName);
 
+            // Download to temporary file
             FileUtils.copyURLToFile(url, tempFile);
 
+            // Get expected hash from GitHub
             String expectedHash = getExpectedHashFromGitHub();
             if (expectedHash != null) {
+                // Calculate actual hash using Java's built-in MessageDigest
                 String actualHash = calculateSHA256(tempFile);
+
                 if (!expectedHash.equalsIgnoreCase(actualHash)) {
                     tempFile.delete();
-                    getLogger().severe("Hash verification failed!");
+                    getLogger().severe("Hash verification failed! Downloaded file may be corrupted or tampered with.");
                     return;
                 }
             }
 
+            // Safe file replacement
             if (updateFile.exists()) {
                 File backupFile = new File(pluginsDir, fileName + ".bak");
                 if (backupFile.exists()) backupFile.delete();
@@ -107,8 +140,9 @@ public class Main extends JavaPlugin {
                 throw new Exception("Failed to rename temporary file");
             }
 
-            pendingUpdateFile = updateFile;
-            getLogger().warning("Update downloaded! Restart server to apply.");
+            getLogger().warning("Update successfully downloaded. Restart server to apply v" +
+                    latestVersion);
+
         } catch (Exception e) {
             if (tempFile != null && tempFile.exists()) tempFile.delete();
             getLogger().warning("Update failed: " + e.getMessage());
@@ -140,6 +174,7 @@ public class Main extends JavaPlugin {
                         new InputStreamReader(conn.getInputStream())
                 );
 
+                // Option 1: Get from release body
                 String body = (String) response.get("body");
                 if (body != null) {
                     for (String line : body.split("\\r?\\n")) {
@@ -148,25 +183,13 @@ public class Main extends JavaPlugin {
                         }
                     }
                 }
+
+                // Option 2: Get from asset metadata (would require auth)
             }
         } catch (Exception e) {
             getLogger().warning("Couldn't fetch hash from GitHub: " + e.getMessage());
         }
         return null;
-    }
-
-    private boolean isNewerVersion(String latest, String current) {
-        String[] latestParts = latest.split("\\.");
-        String[] currentParts = current.split("\\.");
-
-        for (int i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
-            int latestNum = (i < latestParts.length) ? Integer.parseInt(latestParts[i]) : 0;
-            int currentNum = (i < currentParts.length) ? Integer.parseInt(currentParts[i]) : 0;
-
-            if (latestNum > currentNum) return true;
-            if (latestNum < currentNum) return false;
-        }
-        return false;
     }
 
     @Override
@@ -178,23 +201,25 @@ public class Main extends JavaPlugin {
                 File currentJar = getFile();
                 File pluginsDir = currentJar.getParentFile();
 
+                // Create backup
                 File backupFile = new File(pluginsDir, currentJar.getName() + ".bak");
                 if (backupFile.exists()) Files.delete(backupFile.toPath());
                 Files.copy(currentJar.toPath(), backupFile.toPath());
 
+                // Apply update
                 Files.move(
                         pendingUpdateFile.toPath(),
                         currentJar.toPath(),
                         StandardCopyOption.REPLACE_EXISTING
                 );
 
-                getLogger().info("Update applied!");
+                getLogger().info("Successfully updated to new version!");
             } catch (Exception e) {
                 getLogger().severe("Failed to apply update: " + e.getMessage());
                 try {
                     if (pendingUpdateFile.exists()) Files.delete(pendingUpdateFile.toPath());
                 } catch (Exception ex) {
-                    getLogger().warning("Cleanup failed: " + ex.getMessage());
+                    getLogger().warning("Failed to clean up: " + ex.getMessage());
                 }
             }
         }

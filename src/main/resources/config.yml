@@ -4,5 +4,4 @@ warps:
   public: {}
   private: {}
 command-states: {}
-auto-update:
-  enabled: false
+auto-update: false
