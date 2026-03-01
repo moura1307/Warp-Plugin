@@ -16,8 +16,6 @@ import java.util.HexFormat;
 public class AutoUpdate {
     private final Main plugin;
 
-    private File pendingUpdateFile;
-
     public AutoUpdate(Main plugin) {
         this.plugin = plugin;
     }
@@ -143,7 +141,6 @@ public class AutoUpdate {
                         new InputStreamReader(conn.getInputStream())
                 );
 
-                // Option 1: Get from release body
                 String body = (String) response.get("body");
                 if (body != null) {
                     for (String line : body.split("\\r?\\n")) {
@@ -152,8 +149,6 @@ public class AutoUpdate {
                         }
                     }
                 }
-
-                // Option 2: Get from asset metadata (would require auth)
             }
         } catch (Exception e) {
             plugin.getLogger().warning("Couldn't fetch hash from GitHub: " + e.getMessage());

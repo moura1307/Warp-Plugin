@@ -5,13 +5,13 @@ import org.bukkit.entity.Player;
 import java.util.*;
 
 public class WarpConfig implements CommandExecutor, TabCompleter {
-    private static final String USAGE = "§6Usage:§f /warpconfig <WarpOpOnly|WarpPublicOnly> <enable|disable>";
+    private static final String USAGE = "§6Usage:§f /warpconfig <WarpOpOnly | WarpPublicOnly> <enable | disable>";
     private static final String PLAYER_ONLY = "§cThis command is for players only!";
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
         if (!(sender instanceof Player) || !sender.isOp()) {
-            sender.sendMessage("§cNo permission!");
+            sender.sendMessage(PLAYER_ONLY);
             return true;
         }
 

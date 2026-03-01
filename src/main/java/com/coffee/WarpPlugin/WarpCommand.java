@@ -1,6 +1,5 @@
 package com.coffee.WarpPlugin;
 
-import com.coffee.WarpPlugin.CommandManager;
 import org.bukkit.*;
 import org.bukkit.command.*;
 import org.bukkit.configuration.ConfigurationSection;
@@ -28,11 +27,10 @@ public class WarpCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage(PLAYER_ONLY);
             return true;
         }
-        Player player = (Player) sender;
 
         if (args.length == 0) {
             sendUsage(player);

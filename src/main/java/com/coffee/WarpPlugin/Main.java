@@ -7,28 +7,27 @@ import java.io.File;
 
 public class Main extends JavaPlugin {
     private WarpCommand warpCommand;
-    private com.coffee.WarpPlugin.WarpConfig warpConfig;
-
-    public File getPluginFile() {
-        return super.getFile();
-    }
-
-    private String currentVersion;
-    private String githubRepo;
-
-    AutoUpdate updater = new AutoUpdate(this);
+    private WarpConfig warpConfig;
+    private WarpMenu warpMenu;
+    private AutoUpdate updater;
 
     @Override
     public void onEnable() {
+
         saveDefaultConfig();
         reloadConfig();
-        CommandManager.initialize(this);
 
         this.warpCommand = new WarpCommand(this);
         this.warpConfig = new WarpConfig();
+        this.warpMenu = new WarpMenu(this);
+        this.updater = new AutoUpdate(this);
+        CommandManager.initialize(this);
 
         getCommand("warp").setExecutor(warpCommand);
         getCommand("warpconfig").setExecutor(warpConfig);
+        getCommand("warpmenu").setExecutor(warpMenu);
+
+        Bukkit.getPluginManager().registerEvents(new WarpMenuListener(), this);
 
         warpCommand.loadLocations();
 

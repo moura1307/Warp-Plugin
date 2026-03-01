@@ -20,6 +20,9 @@ commands:
   warp:
     description: Teleport to locations
     usage: /warp <list | set | remove | rename | to> [name] [public]
+  warpmenu:
+    description: New warp menu designed for a better experience!
+    usage: /warpmenu
   warpconfig:
     description: Configure warp settings
     usage: /warpconfig <WarpOpOnly | WarpPublicOnly> <enable | disable>
